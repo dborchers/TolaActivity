@@ -65,7 +65,7 @@ class CustomDashboardCreate(CreateView):
     except FormGuidance.DoesNotExist:
         guidance = None
 
-    @method_decorator(group_excluded('ViewOnly', url='workflow/permission'))
+    @method_decorator(group_excluded('ViewOnly', url='activitydb/permission'))
     def dispatch(self, request, *args, **kwargs):
         return super(CustomDashboardCreate, self).dispatch(request, *args, **kwargs)
 
@@ -91,19 +91,23 @@ class CustomDashboardCreate(CreateView):
 
         return self.render_to_response(self.get_context_data(form=form))
 
-    def form_valid(self, form):
-        print form
-        form.save()
+    def form_valid(self, form):        
+        if form.is_valid():
+            data = form.save(commit=False)
+            form_theme = data.theme
+            getSelectedTheme = DashboardTheme.objects.all().filter(id=form_theme.id)
+            parsedLayout = json.loads(getSelectedTheme[0].layout_dictionary, object_pairs_hook=OrderedDict)
+            new_map = {}
+            for key in parsedLayout:
+                new_map[key] = "NONE"
+            data.component_map = json.dumps(new_map)
+            data.save()
 
         #save formset from context
         context = self.get_context_data()
 
         messages.success(self.request, 'Success, Dashboard Created!')
-
-        latest = CustomDashboard.objects.latest('id')
-        getCustomDashboard = CustomDashboard.objects.get(id=latest.id)
-        dashboard_id = getCustomDashboard.id
-        redirect_url = '/configurabledashboard/update/' + str(dashboard_id) 
+        redirect_url = '/configurabledashboard/' + str(self.kwargs['pk'])
         return HttpResponseRedirect(redirect_url)
 
     form_class = CustomDashboardCreateForm 
